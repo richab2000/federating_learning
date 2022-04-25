@@ -40,81 +40,79 @@ class Net(nn.Module):
 
     def __init__(self) -> None:
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        input_size, output_size, hidden_layer_size = 784, 62, 128
+        self.fc1 = nn.Linear(input_size, hidden_layer_size)
+        self.fc2 = nn.Linear(hidden_layer_size, output_size)
+        #self.conv1 = nn.Conv2d(3, 6, 5)
+        #self.pool = nn.MaxPool2d(2, 2)
+        #self.conv2 = nn.Conv2d(6, 16, 5)
+        #self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        #self.fc2 = nn.Linear(120, 84)
+        #self.fc3 = nn.Linear(84, 10)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+    def forward(self, x): #: torch.Tensor) -> torch.Tensor:
+        #print("X VALUE", x, type(x))
+        out = self.fc1(x)
+        out = F.relu(out)
+        out = self.fc2(out)
+        return out
+        #x = self.pool(F.relu(self.conv1(x)))
+        #x = self.pool(F.relu(self.conv2(x)))
+        #x = x.view(-1, 16 * 5 * 5)
+        #x = F.relu(self.fc1(x))
+        #x = F.relu(self.fc2(x))
+        #return self.fc3(x)
 
 
 def train(net, trainloader, epochs):
     """Train the model on the training set."""
     print("TRAINING")
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.MSELoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-    #for _ in range(epochs):
-    #    for labels, images in trainloader:
-    #        labels, images = labels.to(DEVICE), images.to(DEVICE)
-    #        optimizer.zero_grad()
-    #        loss = criterion(net(images), labels)
-    #        loss.backward()
-    #        optimizer.step()
-
     for _ in range(epochs):
-        for instance in tqdm(trainloader):
-            lst = instance[0]
-            images = np.array(np.array([x[1:]] for x in lst))
-            labels = np.array(np.array([x[0]] for x in lst))
-            #print('image', img)
-            #print('lab', label)
+        for data in trainloader:
+            labels = torch.as_tensor(data['y'])
+            images = data['x']
+            #images = np.asarray(data['x'])
+            #images = torch.from_numpy([i.astype('long') for i in images])
+            #images = torch.tensor(images)
+            one_hot = torch.nn.functional.one_hot(labels.long(), num_classes= 62)
+
+            #labels, images = one_hot.to(DEVICE), images.to(DEVICE)
+
             optimizer.zero_grad()
             loss = criterion(net(images), labels)
             loss.backward()
-            #criterion(net(images.to(DEVICE)), labels.to(DEVICE)).backward()
             optimizer.step()
-            print("success")
-
-    print("FINISHED TRAINING")
-
 
 def test(net, testloader):
     """Validate the model on the test set."""
     print("TESTING")
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.MSELoss()
     correct, total, loss = 0, 0, 0.0
     with torch.no_grad():
-        print("LEN TESTLOADER", len(testloader))
         for data in testloader:
-            print("PRINTING DATA")
-            print(data)
-            print("PRINTING SINGULAR")
-            #print(data[0].to(DEVICE),data[1].to(DEVICE))
-            exit(0)
-            #images, labels = data[0].to(DEVICE), data[1].to(DEVICE)
-            #outputs = net(images)
-            #loss += criterion(outputs, labels).item()
-            #_, predicted = torch.max(outputs.data, 1)
-            #total += labels.size(0)
-            #correct += (predicted == labels).sum().item()
-    #accuracy = correct / total
-    #return loss, accuracy
-    #with torch.no_grad():
-    #    for images, labels in tqdm(testloader):
-    #        outputs = net(images.to(DEVICE))
-    #        labels = labels.to(DEVICE)
-    #        loss += criterion(outputs, labels).item()
-    #        total += labels.size(0)
-    #        correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    #return loss / len(testloader.dataset), correct / total
+            labels = torch.as_tensor(data['y'])
+            images = data['x']
+            images = torch.tensor(images)
+
+            #images = np.asarray(data['x'])
+            #print(images)
+            #print("images", type(images), type(images[0]))
+            #exit(0)
+            #images = torch.from_numpy([i.astype('long') for i in images])
+
+            one_hot = torch.nn.functional.one_hot(labels.long(), num_classes= 62)
+
+            #labels, images = one_hot.to(DEVICE), images.to(DEVICE)
+
+            outputs = net(images)
+            loss += criterion(outputs, labels).item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    accuracy = correct / total
+    return loss, accuracy
 
 
 def load_data(folder_name, data_type, file_name):
@@ -130,17 +128,6 @@ def load_data(folder_name, data_type, file_name):
         trainset.append(json.load(f))
         training_data = trainset[0]['records']
         training_data = np.array([np.array(lst) for lst in training_data])
-        #print(trainset[0]['records'])
-        #print(type(training_data))
-        #print(len(trainset[0]['records']))
-        #print(type(training_data[0]))
-
-        #trainset = trainset.to_csv(file_name)
-    #for file_name in listdir(title_tr):
-    #    if isfile(join(title_tr, file_name)):
-    #        if file_name != "_main.json":
-    #            with open(title_tr + '/' + file_name, 'r') as f:
-    #               trainset.append(json.load(f))
 
     testset = []
     with open(title_te + '/' + file_name, 'r') as f:
@@ -148,43 +135,25 @@ def load_data(folder_name, data_type, file_name):
         testing_data = testset[0]['records']
         testing_data = np.array([np.array(lst) for lst in testing_data])
 
-    print(testing_data)
-    exit(0)
+    train_lst = []
+    d = {}
+    for t in training_data:
+        d['y'] = float(t[0])
+        #print("DATA TYPE Y", type(t[0]))
+        d['x'] = [float(x) for x in t[1:]]
+        #print("DATA TYPE X", type(t[1]))
+        train_lst.append(d)
+        d = {}
 
-    #for file_name in listdir(title_te):
-    #    if isfile(join(title_te, file_name)):
-    #        if file_name != "_main.json":
-    #            with open(title_te + '/' + file_name, 'r') as f:
-    #                testset.append(json.load(f))
+    test_lst = []
+    d = {}
+    for t in testing_data:
+        d['y'] = float(t[0])
+        d['x'] = [float(x) for x in t[1:]] 
+        test_lst.append(d)
+        d = {}
 
-
-
-    #update trainset
-    #lst_train = []
-    #for t in trainset:
-    #    cols = t['column_name']
-    #    for vals in t['records']:
-    #        d = {}
-    #        for i in range(len(cols)):
-    #            d[cols[i]] = vals[i]
-    #        lst_train.append(d)
-    #trainset = lst_train
-
-    #update testset     
-    #lst_test = []
-    #for t in testset:
-    #    cols = t['column_name']
-    #    for vals in t['records']:
-    #        d = {}
-    #        for i in range(len(cols)):
-    #            d[cols[i]] = vals[i]
-    #        lst_test.append(d)
-    #testset = lst_test
-    #print("Len tstset", len(testset))
-            
-    #print(testset)
-    #exit(0)
-    return DataLoader(training_data, batch_size=32, shuffle=False), DataLoader(testing_data)
+    return DataLoader(train_lst, batch_size=32, shuffle=True), DataLoader(test_lst)
 
 
 # #############################################################################
@@ -193,7 +162,7 @@ def load_data(folder_name, data_type, file_name):
 
 # Load model and data (simple CNN, CIFAR-10)
 net = Net().to(DEVICE)
-trainloader, testloader = load_data('femnist','leaf', 'f0003_42.json')
+trainloader, testloader = load_data('femnist','leaf', 'f0006_12.json')
 #print("PRINTING TEST OUTSIDE")
 #print(testloader)
 
